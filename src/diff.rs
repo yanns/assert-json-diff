@@ -5,7 +5,7 @@ use std::{collections::HashSet, fmt};
 
 pub(crate) fn diff<'a>(lhs: &'a Value, rhs: &'a Value, config: Config) -> Vec<Difference<'a>> {
     let mut acc = vec![];
-    diff_with(lhs, rhs, config, Path::Root, &mut acc);
+    diff_with(lhs, rhs, config, Path::Root, &mut acc, 20);
     acc
 }
 
@@ -15,15 +15,19 @@ fn diff_with<'a>(
     config: Config,
     path: Path<'a>,
     acc: &mut Vec<Difference<'a>>,
+    rec: u32,
 ) {
-    let mut folder = DiffFolder {
-        rhs,
-        path,
-        acc,
-        config,
-    };
+    if rec > 1 {
+        let mut folder = DiffFolder {
+            rhs,
+            path,
+            acc,
+            rec: rec - 1,
+            config,
+        };
 
-    fold_json(lhs, &mut folder);
+        fold_json(lhs, &mut folder);
+    }
 }
 
 #[derive(Debug)]
@@ -31,6 +35,7 @@ struct DiffFolder<'a, 'b> {
     rhs: &'a Value,
     path: Path<'a>,
     acc: &'b mut Vec<Difference<'a>>,
+    rec: u32,
     config: Config,
 }
 
@@ -79,7 +84,7 @@ impl<'a, 'b> DiffFolder<'a, 'b> {
                         let path = self.path.append(Key::Idx(idx));
 
                         if let Some(lhs) = lhs.get(idx) {
-                            diff_with(lhs, rhs, self.config.clone(), path, self.acc)
+                            diff_with(lhs, rhs, self.config.clone(), path, self.acc, self.rec)
                         } else {
                             self.acc.push(Difference {
                                 lhs: None,
@@ -101,7 +106,7 @@ impl<'a, 'b> DiffFolder<'a, 'b> {
 
                         match (lhs.get(key), rhs.get(key)) {
                             (Some(lhs), Some(rhs)) => {
-                                diff_with(lhs, rhs, self.config.clone(), path, self.acc);
+                                diff_with(lhs, rhs, self.config.clone(), path, self.acc, self.rec);
                             }
                             (None, Some(rhs)) => {
                                 self.acc.push(Difference {
@@ -146,7 +151,7 @@ impl<'a, 'b> DiffFolder<'a, 'b> {
                         let path = self.path.append(Key::Field(key));
 
                         if let Some(lhs) = lhs.get(key) {
-                            diff_with(lhs, rhs, self.config.clone(), path, self.acc)
+                            diff_with(lhs, rhs, self.config.clone(), path, self.acc, self.rec)
                         } else {
                             self.acc.push(Difference {
                                 lhs: None,
@@ -164,7 +169,7 @@ impl<'a, 'b> DiffFolder<'a, 'b> {
 
                         match (lhs.get(key), rhs.get(key)) {
                             (Some(lhs), Some(rhs)) => {
-                                diff_with(lhs, rhs, self.config.clone(), path, self.acc);
+                                diff_with(lhs, rhs, self.config.clone(), path, self.acc, self.rec);
                             }
                             (None, Some(rhs)) => {
                                 self.acc.push(Difference {
